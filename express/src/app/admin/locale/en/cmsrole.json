@@ -1,0 +1,12 @@
+{
+  "actions": {
+    "dontTouchThis": "Don't touch this!!!"
+  },
+  "properties": {
+    "organizationId": "Organization"
+  },
+  "messages": {
+    "deleteGuard": "Do you really want to delete this record?"
+  },
+  "labels": {}
+}

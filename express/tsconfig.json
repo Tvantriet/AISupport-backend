@@ -1,0 +1,57 @@
+{
+  "ts-node": {
+    "experimentalResolver": true,
+    "esm": true
+  },
+  "compilerOptions": {
+    "jsx": "react",
+    "target": "ESNext",
+    "module": "NodeNext",
+    "removeComments": true,
+    "downlevelIteration": true,
+    "isolatedModules": true,
+    "noImplicitAny": false,
+    "importHelpers": true,
+    "lib": [
+      "esnext",
+      "DOM"
+    ],
+    "strictNullChecks": false
+    /* Enable strict null checks. */,
+    "strictFunctionTypes": false
+    /* Enable strict checking of function types. */,
+    "strictBindCallApply": false
+    /* Enable strict 'bind', 'call', and 'apply' methods on functions. */,
+    // "strictPropertyInitialization": true /* Enable strict checking of property initialization in classes. */,
+    "noImplicitThis": false
+    /* Raise error on 'this' expressions with an implied 'any' type. */,
+    "alwaysStrict": false
+    /* Parse in strict mode and emit "use strict" for each source file. */,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "moduleResolution": "NodeNext",
+    "sourceMap": true,
+    "outDir": "dist",
+    "strict": true,
+    "baseUrl": ".",
+    "typeRoots": [
+      "types"
+    ],
+    "paths": {
+      "*": [
+        "node_modules/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "prisma"
+  ],
+  "exclude": [
+    "node_modules/*"
+  ]
+}

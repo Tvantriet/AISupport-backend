@@ -1,0 +1,5 @@
+sync.ffs_db
+cloudbuild.yaml
+Dockerfile
+/.idea/
+.vscode/

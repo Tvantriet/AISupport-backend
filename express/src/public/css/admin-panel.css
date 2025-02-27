@@ -1,0 +1,179 @@
+/* Sidebar styles */
+
+a[data-css="sidebar-logo"] > img {
+	max-width: 120px;
+}
+
+@media screen and (min-width: 786px) {
+	section[data-css="drawer"] {
+		min-width: 510px;
+	}
+}
+
+/* Popup styles */
+
+div[id^="UNIQUE_KEY_TOOLTIP"] > section,
+div[id^="UNIQUE_KEY_MODAL"] > section {
+	z-index: 150;
+}
+
+/* Generic */
+
+input[class^="input__Input"],
+textarea {
+	resize: none;
+	border: 1px solid #C0C0CA !important;
+  }
+
+.adminjs_Header > img {
+	width: auto;
+	max-width: 289px !important;
+	height: 100px;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+a {
+	text-decoration: none;
+	color: inherit;
+}
+
+a.adminjs_Header {
+	display: block;
+}
+
+body {
+	overflow: hidden;
+}
+
+[id*="UNIQUE_KEY_TOOLTIP"] > section {
+	z-index: 3000;
+	max-width: 400px;
+	word-break: keep-all;
+	line-height: 28px;
+	border-color: #466bd7;
+	background: #466bd7;
+	color: #fff;
+}
+
+[id*="UNIQUE_KEY_TOOLTIP"] > section::after {
+	border-color: transparent #466bd7 transparent transparent;
+}
+
+[id*="UNIQUE_KEY_TOOLTIP"] > section::before {
+	border-color: transparent #466bd7 transparent transparent;
+}
+
+[data-css*="sidebar-resources"] > section > label {
+	display: none;
+}
+
+[data-css*="sidebar-resources"] a {
+	text-decoration: none;
+}
+
+[data-css*="sidebar"],
+[data-css*="topbar"] {
+	border: none !important;
+}
+
+[data-css*="app-content"] {
+	display: flex;
+	height: 100%;
+}
+
+[data-css*="app-content"]::after {
+	content: "© Livewall 2024. All rights reserved";
+	width: 100%;
+	flex-grow: 1;
+	height: 40px;
+	display: flex;
+	justify-content: center;
+	align-items: flex-end;
+	padding-bottom: 42px;
+	padding-top: 55px;
+	box-sizing: border-box;
+	color: #6b7781;
+	mix-blend-mode: normal;
+	opacity: 0.9;
+	font-size: 0.8rem;
+}
+
+[data-css*="-list-table-wrapper"] {
+	border-radius: 8px;
+	box-shadow: 0px 4px 8px rgba(57, 73, 86, 0.05);
+	padding: 0 !important;
+	margin-top: 20px !important;
+}
+
+[data-css*="-drawer-content"] {
+	border-radius: 8px 8px 0 0;
+	box-shadow: 0px 4px 8px rgba(57, 73, 86, 0.05);
+}
+
+[data-css*="-drawer-footer"] {
+	border-radius: 0 0 8px 8px;
+	box-shadow: 0px 4px 8px rgba(57, 73, 86, 0.05);
+}
+
+[data-css*="-list-table-wrapper"] thead > tr > td {
+	padding: 12px 16px;
+}
+
+[data-css*="-list-table-wrapper"] table,
+[data-css*="-list-table-wrapper"] tr,
+[data-css*="-list-table-wrapper"] thead td {
+	border-top-width: 0 !important;
+	border-left-width: 0 !important;
+	border-right-width: 0 !important;
+}
+
+section[data-css*="-list"] {
+	height: unset;
+}
+
+.adminjs_NavBar {
+	height: 100px !important;
+	align-items: center;
+}
+
+.adminjs_Logo {
+	padding: 32px !important;
+}
+
+.adminjs_Pagination {
+	margin-bottom: 24px;
+	border-radius: 6px;
+}
+
+.adminjs_Input,
+.adminjs_CurrencyInput {
+	border-radius: 6px !important;
+	min-height: 40px;
+}
+
+.adminjs_Select > div {
+	border-radius: 6px !important;
+	min-height: 40px;
+}
+
+[data-css*="-edit-isSuperAdmin"] > div {
+	display: flex;
+	align-items: center;
+}
+
+[data-css*="-edit-isSuperAdmin"] > div > label {
+	margin-bottom: 0 !important;
+}
+
+.adminjs_NavBar {
+	box-shadow: 0px 4px 8px rgba(57, 73, 86, 0.05);
+	z-index: 99;
+}
+
+[data-css="sidebar"] {
+	z-index: 110 !important;
+	box-shadow: 0px 4px 8px rgba(57, 73, 86, 0.05);
+}

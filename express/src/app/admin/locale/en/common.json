@@ -1,0 +1,27 @@
+{
+	"messages": {
+		"loginWelcome": "Welcome to the Livewall cms.",
+		"Has to be filled": "Has to be filled",
+		"thereWereValidationErrors": "There were validation errors",
+		"forgotPasswordQuestion": "Trouble logging in?",
+		"forgotPassword": "Forgot password"
+	},
+	"labels": {
+		"navigation": "Admin",
+		"CmsRole": "Cms roles",
+		"CmsUser": "Cms users"
+	},
+	"properties": {},
+	"actions": {},
+	"components": {
+		"Login": {
+			"welcomeHeader": "Welcome",
+			"welcomeMessage": "to AdminJS - the world's leading open-source auto-generated admin panel for your Node.js application that allows you to manage all your data in one place",
+			"properties": {
+				"email": "Email",
+				"password": "Password"
+			},
+			"loginButton": "Login"
+		}
+	}
+}

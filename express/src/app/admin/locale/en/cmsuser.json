@@ -1,0 +1,12 @@
+{
+  "actions": {
+    "new": "Create new user"
+  },
+  "properties": {
+    "organizationId": "Organization"
+  },
+  "messages": {
+    "deleteGuard": "Do you really want to delete this record?"
+  },
+  "labels": {}
+}
