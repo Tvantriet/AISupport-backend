@@ -3,3 +3,4 @@ cloudbuild.yaml
 Dockerfile
 /.idea/
 .vscode/
+express/.env.example
