@@ -1,6 +1,7 @@
 import apiRoutes from "../middleware/ApiRoutes.js";
 import ApiRouter from "./api.js";
 import WebRouter from "./web.js";
+import ProductInterfaceRoutes from "./productInterface.routes.js";
 
 import { Router } from "express";
 
@@ -15,4 +16,6 @@ export default (router: Router) => {
 		apiRoutes,
 		apiRouter.getRoutes(),
 	);
+
+	router.use("/api/products", new ProductInterfaceRoutes().getRoutes());
 };

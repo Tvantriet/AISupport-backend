@@ -2,7 +2,6 @@ import { Response } from "express";
 import { check, ValidationChain } from "express-validator";
 import ApiResponses from "../utils/ApiResponses.js";
 import Controller from "./Controller.js";
-
 export default class MainController extends Controller {
 	public validate(method: string) {
 		let validation: ValidationChain[] = [];
