@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto, { CipherGCMTypes } from "crypto";
 import config from "../../config/app.js";
 
 export default class Crypt {
@@ -24,26 +24,7 @@ export default class Crypt {
 	 * @param value
 	 */
 	public static encrypt(value: string) {
-		if (!value) {
-			return value;
-		}
-
-		const iv = crypto.randomBytes(16);
-		const base64Iv = iv.toString("base64");
-		const cipher = crypto.createCipheriv(this.cipher, this.key, iv);
-
-		let encrypted = cipher.update(value, "utf8", "base64");
-		encrypted += cipher.final("base64");
-
-		const mac = this.hash(encrypted, base64Iv);
-		const payloadObject = {
-			iv: base64Iv,
-			value: encrypted,
-			mac: mac,
-		};
-
-		const _payload = JSON.stringify(payloadObject);
-		return Buffer.from(_payload).toString("base64");
+		return "error";
 	}
 
 	/**
@@ -53,12 +34,8 @@ export default class Crypt {
 	public static decrypt(payload: string) {
 		const _payload: any = this.getJsonPayload(payload);
 		const iv = Buffer.from(_payload.iv, "base64");
-		const decipher = crypto.createDecipheriv(this.cipher, this.key, iv);
 
-		let decrypted = decipher.update(_payload.value, "base64", "utf8");
-		decrypted += decipher.final("utf8");
-
-		return decrypted;
+		return "error";
 	}
 
 	/**

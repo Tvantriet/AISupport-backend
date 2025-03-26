@@ -73,6 +73,7 @@ class Server {
 	 * Setup express server
 	 */
 	public async init() {
+		console.log("starting server");
 		this.app = express();
 		const router = express.Router();
 
@@ -110,6 +111,8 @@ class Server {
 
 		// Run http server
 		await this.start();
+		console.log("started server");
+
 	}
 
 	/**

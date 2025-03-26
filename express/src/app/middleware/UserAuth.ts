@@ -27,5 +27,6 @@ export default async function appUserAuth(req: Request, res: Response, next: Nex
 			return ApiResponses.errorResponse(res, "authorizationInvalid");
 		}
 	}
+	console.log("No token provided");
 	return ApiResponses.errorResponse(res, "forbidden");
 }

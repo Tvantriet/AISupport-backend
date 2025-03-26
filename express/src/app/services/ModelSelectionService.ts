@@ -3,15 +3,15 @@
 //CURRENTLY NOT IN USE DO NOT MAKE EDITS TO THIS FILE!
 
 export default class ModelSelectionService {
-    public getPrimaryModel(): string {
-        return process.env.PRIMARY_MODEL || 'gpt-4o-mini';
-    }
+	public getPrimaryModel(): string {
+		return process.env.PRIMARY_MODEL || "gpt-4o-mini";
+	}
 
-    public getSecondaryModel(): string {
-        return process.env.SECONDARY_MODEL || 'gpt-4o-mini';
-    }
+	public getSecondaryModel(): string {
+		return process.env.SECONDARY_MODEL || "gpt-4o-mini";
+	}
 
-    public getEmbeddingModel(): string {
-        return process.env.EMBEDDING_MODEL || 'text-embedding-3-large';
-    }
+	public getEmbeddingModel(): string {
+		return process.env.EMBEDDING_MODEL || "text-embedding-3-large";
+	}
 }

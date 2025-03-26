@@ -2,6 +2,8 @@ import apiRoutes from "../middleware/ApiRoutes.js";
 import ApiRouter from "./api.js";
 import WebRouter from "./web.js";
 import ProductInterfaceRoutes from "./productInterface.routes.js";
+import ChatInterfaceRoutes from "./chatInterface.routes.js";
+import TestRoutes from "./test.routes.js";
 
 import { Router } from "express";
 
@@ -18,4 +20,6 @@ export default (router: Router) => {
 	);
 
 	router.use("/api/products", new ProductInterfaceRoutes().getRoutes());
+	router.use("/api/chat", new ChatInterfaceRoutes().getRoutes());
+	router.use("/api/test", new TestRoutes().getRoutes());
 };

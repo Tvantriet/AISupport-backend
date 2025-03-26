@@ -11,8 +11,15 @@ import config from "../../config/app.js";
  */
 export default function apiRoutes(req: Request, res: Response, next: NextFunction) {
 	const loadRoutes = config.loadRoutes as string;
+	console.log(req.path);
 
 	if (!["api", "all"].includes(loadRoutes)) return ApiResponses.errorResponse(res, "forbidden", {}, 405);
+
+	// Skip authentication for status endpoint
+	if (req.path === '/status') {
+		console.log("test");
+		return next();
+	}
 
 	return next();
 }
