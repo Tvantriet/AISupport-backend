@@ -1,7 +1,12 @@
 import fetch from "node-fetch";
 import prompts from "../config/prompts.js";
+import { AIProvider } from "../interfaces/AIProvider.js";
 
-export default class OpenAIService {
+/**
+ * Service for interacting with OpenAI API
+ * Implements AIProvider interface for chat operations
+ */
+export default class OpenAIService implements AIProvider {
 	private apiKey: string;
 
 	constructor() {
@@ -12,23 +17,25 @@ export default class OpenAIService {
 	}
 
 	/**
-	 * Create an embedding for the given text
+	 * Create a chat completion using OpenAI API
 	 *
-	 * @param text The text to create an embedding for
-	 * @param model The embedding model to use (default: text-embedding-3-small)
-	 * @returns The embedding vector
+	 * @param messages Array of chat messages
+	 * @returns The generated message content
 	 */
-	public async createEmbedding(text: string): Promise<number[]> {
+	public async createChatCompletion(
+		messages: Array<{ role: string; content: string }>
+	): Promise<string> {
 		try {
-			console.log(`Creating embedding for text (${text.length} chars, first 50 chars: "${text.substring(0, 50)}...")`);
+			console.log(`Creating chat completion with ${messages.length} messages`);
 			
 			const requestBody = {
-				model: "text-embedding-3-small",
-				input: text,
+				model: process.env.OPENAI_CHAT_MODEL || "gpt-4o",
+				messages: messages,
+				temperature: 0.5,
+				max_tokens: 1000,
 			};
 			
-			console.log("Sending request to OpenAI embeddings API");
-			const response = await fetch("https://api.openai.com/v1/embeddings", {
+			const response = await fetch("https://api.openai.com/v1/chat/completions", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -37,65 +44,40 @@ export default class OpenAIService {
 				body: JSON.stringify(requestBody),
 			});
 
-			console.log(`Received response with status: ${response.status} ${response.statusText}`);
-			
-			// Log response headers for debugging
-			const headers: Record<string, string> = {};
-			response.headers.forEach((value, key) => {
-				headers[key] = value;
-			});
-			console.log("Response headers:", headers);
-			
-			// Get response as text first for safer handling
-			const responseText = await response.text();
-			console.log(`Raw response (first 200 chars): "${responseText.substring(0, 200)}..."`);
-			
-			// Check for HTML in response
-			if (responseText.includes("<html") || responseText.includes("<!DOCTYPE")) {
-				console.error("HTML detected in response, this indicates an error");
-				throw new Error("OpenAI API returned HTML instead of JSON. Check API key and rate limits.");
+			if (response.status !== 200) {
+				console.error(`API error: ${response.status} ${response.statusText}`);
 			}
 			
-			// Try to parse the JSON
+			const responseText = await response.text();
 			let responseData;
+			
 			try {
 				responseData = JSON.parse(responseText);
 			} catch (parseError) {
-				console.error("Failed to parse JSON response:", parseError);
-				throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+				throw new Error(`Invalid JSON response from OpenAI API: ${responseText.substring(0, 100)}...`);
 			}
 			
-			// Check if the expected data is present
-			if (!responseData.data || !responseData.data[0] || !responseData.data[0].embedding) {
-				console.error("Unexpected response structure:", responseData);
+			if (!responseData.choices || !responseData.choices[0] || !responseData.choices[0].message) {
 				throw new Error("Invalid response format from OpenAI API");
 			}
 
-			console.log(`Successfully created embedding with ${responseData.data[0].embedding.length} dimensions`);
-			return responseData.data[0].embedding;
+			return responseData.choices[0].message.content;
 		} catch (error: any) {
-			console.error("Error creating embedding:", {
-				message: error.message,
-				stack: error.stack,
-				response: error.response ? {
-					status: error.response.status,
-					headers: error.response.headers,
-					data: error.response.data
-				} : "No response data"
-			});
-			throw new Error(`Failed to create embedding: ${error.message}`);
+			console.error("Error creating chat completion:", error.message);
+			throw error;
 		}
 	}
-
+	
 	/**
-	 * Split text into semantic chunks using GPT
-	 *
+	 * Split text into semantically meaningful chunks using OpenAI
+	 * 
 	 * @param text The text to split
-	 * @param model The model to use (default: gpt-4o-mini)
-	 * @returns Array of text chunks
+	 * @returns Promise containing array of text chunks
 	 */
 	public async splitTextIntoChunks(text: string): Promise<string[]> {
 		try {
+			console.log(`Splitting text (${text.length} chars) into semantic chunks with AI`);
+			
 			const response = await fetch("https://api.openai.com/v1/chat/completions", {
 				method: "POST",
 				headers: {
@@ -103,52 +85,69 @@ export default class OpenAIService {
 					Authorization: `Bearer ${this.apiKey}`,
 				},
 				body: JSON.stringify({
-					model: "gpt-4o-mini",
+					model: process.env.OPENAI_SECONDARY_MODEL || "gpt-4o-mini",
 					messages: [
 						{
 							role: "system",
-							content: prompts.system.chunkingAgent
+							content: prompts.system.chunkingAgentExplicit
 						},
 						{
 							role: "user",
 							content: text
-						},
+						}
 					],
-					response_format: { type: "json_object" },
+					temperature: 0.2,
+					response_format: { type: "json_object" }
 				}),
 			});
 
-			const data: any = await response.json();
+			const responseText = await response.text();
+			
+			try {
+				const responseData = JSON.parse(responseText);
+				
+				if (!responseData.choices || !responseData.choices[0] || !responseData.choices[0].message) {
+					throw new Error("Unexpected response structure");
+				}
 
-			if (!data.choices[0].message) {
-				throw new Error("Invalid response from OpenAI API");
+				// Parse the JSON response from the AI
+				const content = responseData.choices[0].message.content;
+				const parsedResponse = JSON.parse(content);
+				
+				if (!parsedResponse.chunks) {
+					throw new Error("Invalid chunks format in response");
+				}
+				
+				return parsedResponse.chunks.map((chunk: any) => chunk.text);
+			} catch (error) {
+				console.error("Error parsing chunking response:", error);
+				throw error;
 			}
-
-			// Parse the response
-			const content = data.choices[0].message.content;
-			const parsedContent = JSON.parse(content);
-
-			// Ensure the response has the expected format
-			if (!Array.isArray(parsedContent.chunks)) {
-				throw new Error("Invalid chunks format from OpenAI API");
-			}
-
-			// Extract just the text from each chunk
-			return parsedContent.chunks.map((chunk: any) => chunk.text);
-		} catch (error: any) {
-			console.error("Error splitting text with GPT:", error);
-			throw new Error(`Failed to split text: ${error.message}`);
+		} catch (error) {
+			console.error("Error splitting text with AI:", error);
+			throw error;
 		}
 	}
 
 	/**
-	 * Enhance a user query using OpenAI
-	 *
-	 * @param query The original user query
-	 * @returns Enhanced query
+	 * Generate follow-up questions based on conversation history
+	 * 
+	 * @param messages Previous conversation messages
+	 * @returns Array of follow-up questions in JSON format
 	 */
-	public async enhanceUserQuery(query: string): Promise<string> {
+	public async generateFollowUpQuestions(messages: Array<{ role: string; content: string }>): Promise<any> {
 		try {
+			console.log("Generating follow-up questions based on conversation history");
+			
+			// Create a new array with system prompt first followed by conversation history
+			const promptMessages = [
+				{
+					role: "system",
+					content: prompts.system.generateQuickFollowUps
+				},
+				...messages
+			];
+			
 			const response = await fetch("https://api.openai.com/v1/chat/completions", {
 				method: "POST",
 				headers: {
@@ -156,132 +155,32 @@ export default class OpenAIService {
 					Authorization: `Bearer ${this.apiKey}`,
 				},
 				body: JSON.stringify({
-					model: "gpt-4o-mini",
-					messages: [
-						{
-							role: "system",
-							content: prompts.system.queryEnhancer
-						},
-						{
-							role: "user",
-							content: prompts.user.enhanceQuery(query)
-						},
-					],
+					model: process.env.OPENAI_SECONDARY_MODEL || "gpt-4o-mini",
+					messages: promptMessages,
+					temperature: 0.6,
+					response_format: { type: "json_object" },
 				}),
 			});
 
-			const data: any = await response.json();
-
-			if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-				throw new Error("Invalid response from OpenAI API");
-			}
-
-			return data.choices[0].message.content;
-		} catch (error: any) {
-			console.error("Error enhancing query:", error);
-			// If enhancement fails, return the original query
-			return query;
-		}
-	}
-
-	/**
-	 * Create a chat completion
-	 *
-	 * @param messages Array of chat messages
-	 * @param options Additional options for the API call
-	 * @returns The generated message content
-	 */
-	public async createChatCompletion(
-		messages: Array<{ role: string; content: string }>,
-		options?: any,
-	): Promise<any> {
-		try {
-			console.log(`Creating chat completion with ${messages.length} messages`);
-			// Log the last message without exposing full history
-			if (messages.length > 0) {
-				const lastMessage = messages[messages.length - 1];
-				console.log(`Last message role: ${lastMessage.role}, content length: ${lastMessage.content.length}`);
-				console.log(`Last message preview: "${lastMessage.content}"`);
-			}
-			
-			const requestBody = {
-				model: options?.model || "gpt-4o",
-				messages: messages,
-				temperature: options?.temperature !== undefined ? options.temperature : 0.7,
-				max_tokens: options?.max_tokens || 1000,
-				// Add other parameters here as needed
-			};
-			
-			console.log("Sending request to OpenAI chat completions API");
-			console.log("Request parameters:", {
-				model: requestBody.model,
-				temperature: requestBody.temperature,
-				max_tokens: requestBody.max_tokens,
-				message_count: requestBody.messages.length
-			});
-			
-			const response = await fetch("https://api.openai.com/v1/chat/completions", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${this.apiKey}`,
-				},
-				body: JSON.stringify(requestBody),
-			});
-
-			console.log(`Received response with status: ${response.status} ${response.statusText}`);
-			
-			// Log response headers for debugging
-			const headers: Record<string, string> = {};
-			response.headers.forEach((value, key) => {
-				headers[key] = value;
-			});
-			console.log("Response headers:", headers);
-			
-			// Get response as text first for safer handling
 			const responseText = await response.text();
-			console.log(`Raw response (first 200 chars): "${responseText.substring(0, 200)}..."`);
 			
-			// Check for HTML in response
-			if (responseText.includes("<html") || responseText.includes("<!DOCTYPE")) {
-				console.error("HTML detected in response, this indicates an error");
-				throw new Error("OpenAI API returned HTML instead of JSON. Check API key and rate limits.");
-			}
-			
-			// Try to parse the JSON
-			let responseData;
 			try {
-				responseData = JSON.parse(responseText);
-			} catch (parseError) {
-				console.error("Failed to parse JSON response:", parseError);
-				throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
-			}
-			
-			// Check for error response
-			if (responseData.error) {
-				console.error("OpenAI API returned an error:", responseData.error);
-				throw new Error(`OpenAI API error: ${responseData.error.message || "Unknown error"}`);
-			}
-			
-			// Check if the expected data is present
-			if (!responseData.choices || !responseData.choices[0] || !responseData.choices[0].message) {
-				console.error("Unexpected response structure:", responseData);
-				throw new Error("Invalid response format from OpenAI API");
-			}
+				const responseData = JSON.parse(responseText);
+				
+				if (!responseData.choices || !responseData.choices[0] || !responseData.choices[0].message) {
+					throw new Error("Unexpected response structure");
+				}
 
-			console.log("Successfully received chat completion");
-			return responseData.choices[0].message.content;
+				// Parse the content which should be a JSON string
+				const content = responseData.choices[0].message.content;
+				return JSON.parse(content);
+			} catch (parseError) {
+				console.error("Failed to parse follow-up questions:", parseError);
+				return [];
+			}
 		} catch (error: any) {
-			console.error("Error creating chat completion:", {
-				message: error.message,
-				stack: error.stack,
-				response: error.response ? {
-					status: error.response.status,
-					headers: error.response.headers,
-					data: error.response.data
-				} : "No response data"
-			});
-			throw new Error(`Failed to create chat completion: ${error.message}`);
+			console.error("Error generating follow-up questions:", error);
+			return []; // Return empty array instead of throwing
 		}
 	}
 }

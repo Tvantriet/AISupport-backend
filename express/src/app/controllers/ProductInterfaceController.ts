@@ -44,7 +44,7 @@ export default class ProductInterfaceController extends Controller {
 	public async createEmptyCollection(req: Request, res: Response) {
 		const {
 			collectionName,
-			dimension = 1536, // Default dimension for text-embedding-3-small
+			dimension = 3072, 
 		} = req.body;
 		
 		try {

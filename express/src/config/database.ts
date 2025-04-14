@@ -66,4 +66,14 @@ export default {
 			addVectorSupport: process.env.DB_ADD_VECTOR_SUPPORT === "1",
 		},
 	},
+
+	// Default to environment variable, with a fallback for local development
+	connectionString: process.env.DATABASE_URL,
+	
+	// Pool configuration
+	pool: {
+		max: 20,
+		min: 2,
+		idle: 10000
+	}
 };

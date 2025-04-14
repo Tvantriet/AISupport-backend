@@ -7,8 +7,11 @@ export default class ChatInterfaceRoutes implements IRoute {
         const router = Router();
         const controller = new ChatInterfaceController();
 
-        // Process a user request with document search and chatbot response
+        // Process a user request with document search, chatbot response, and follow-up questions
         router.post("/process", controller.processUserRequest.bind(controller));
+        
+        // Dedicated endpoint for follow-up questions
+        router.post("/follow-up-questions", controller.getFollowUpQuestions.bind(controller));
         
         // Add this to your existing routes
         router.get("/test", (req, res) => {

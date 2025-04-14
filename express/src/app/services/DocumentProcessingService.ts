@@ -1,20 +1,32 @@
-import OpenAIService from "./OpenAIService.js";
+import { EmbeddingProvider } from "../interfaces/EmbeddingProvider.js";
+import { AIProvider } from "../interfaces/AIProvider.js";
 import QdrantService from "./QdrantService.js";
-import fs from "fs";
-import { PDFExtract } from "pdf.js-extract";
-import mammoth from "mammoth";
 import { v4 as uuidv4 } from 'uuid';
+import OpenAIEmbeddingService from "./OpenAIEmbeddingService.js";
+import OpenAIService from "./OpenAIService.js";
+import TextProcessingService from "./TextProcessingService.js";
 
+/**
+ * Orchestrates the document processing workflow from
+ * text extraction to vector embedding and storage
+ */
 export default class DocumentProcessingService {
-	public openaiService: OpenAIService;
+	private embeddingProvider: EmbeddingProvider;
+	private aiProvider: AIProvider;
+	private textProcessingService: TextProcessingService;
 	public qdrantService: QdrantService;
 
-	constructor() {
-		this.openaiService = new OpenAIService();
-		this.qdrantService = new QdrantService();
+	constructor(
+		embeddingProvider?: EmbeddingProvider,
+		aiProvider?: AIProvider,
+		qdrantService?: QdrantService
+	) {
+		this.embeddingProvider = embeddingProvider || new OpenAIEmbeddingService();
+		this.aiProvider = aiProvider || new OpenAIService();
+		this.qdrantService = qdrantService || new QdrantService();
+		this.textProcessingService = new TextProcessingService(this.aiProvider);
 	}
 
-	
 	/**
 	 * Add documents to an existing collection
 	 * 
@@ -40,6 +52,7 @@ export default class DocumentProcessingService {
 		}
 		
 		// Process documents into vector points
+		// Works by splitting the document up into small chunks chunks (40-500 words) grouped by semantic meaning
 		const points = await this.processDocumentsToVectorPoints(documents);
 		
 		// Add points to the collection
@@ -54,7 +67,8 @@ export default class DocumentProcessingService {
 	}
 
 	/**
-	 * Process documents into vector points for Qdrant
+	 * Process documents into vector points for Qdrant - fully parallel version
+	 * Orchestrates the entire flow from text extraction to embedding creation
 	 *
 	 * @param documents Array of documents to process
 	 * @returns Array of points with id, vector, and payload
@@ -62,204 +76,166 @@ export default class DocumentProcessingService {
 	protected async processDocumentsToVectorPoints(
 		documents: any[],
 	): Promise<Array<{ id: string | number; vector: number[]; payload: any }>> {
-		const vectorPoints = [];
-		let documentIndex = 0;
-
-		for (const document of documents) {
+		console.log(`🔄 Processing ${documents.length} documents`);
+		
+		// Stage 1: Extract text from all documents in parallel
+		console.log(`📑 Stage 1: Extracting text from ${documents.length} documents`);
+		const extractionPromises = documents.map(async (document, index) => {
 			try {
-				documentIndex++;
-				console.log(`Processing document ${documentIndex}/${documents.length}`);
+				const { text, metadata, source } = await this.textProcessingService.extractDocumentContent(document);
+				const fileName = source.split('/').pop() || 'document';
+				console.log(`📄 Extracted ${text.length} chars from doc ${index + 1}/${documents.length}: ${fileName}`);
 				
-				// Step 1: Extract text and metadata from document
-				const { text, metadata, source } = await this.extractDocumentContent(document);
-
-				// Generate a unique document ID if not provided
-				const documentId = document.id || 
-					metadata.id || 
-					`doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-				// Step 2: Split text into semantic chunks
-				const chunks = await this.splitTextIntoSemanticChunks(text);
+				return {
+					text,
+					metadata,
+					source,
+					documentId: document.id || 
+						metadata.id || 
+						`doc_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+					index
+				};
+			} catch (error) {
+				console.error(`❌ Error extracting document ${index + 1}:`, error);
+				return null; // Skip failed documents
+			}
+		});
+		
+		const extractedDocs = (await Promise.all(extractionPromises)).filter(doc => doc !== null);
+		const totalExtractedChars = extractedDocs.reduce((sum, doc) => sum + doc.text.length, 0);
+		console.log(`✅ Extracted ${totalExtractedChars} chars from ${extractedDocs.length}/${documents.length} documents`);
+		
+		// Stage 2: Split all documents into chunks in parallel
+		console.log(`🔪 Stage 2: Splitting ${extractedDocs.length} documents into chunks`);
+		const chunkingPromises = extractedDocs.map(async (doc) => {
+			try {
+				const chunks = await this.textProcessingService.splitTextIntoSemanticChunks(doc.text);
+				console.log(`📄 Doc ${doc.index + 1}: Split into ${chunks.length} chunks`);
 				
-				console.log(`Document split into ${chunks.length} chunks`);
-
-				// Step 3: Create embeddings for each chunk and format as vector points
-				for (let i = 0; i < chunks.length; i++) {
-					const chunk = chunks[i];
-					console.log(`Creating embedding for chunk ${i+1}/${chunks.length}`);
+				// Return chunks with document metadata
+				return chunks.map((chunk, chunkIndex) => ({
+					text: chunk,
+					documentId: doc.documentId,
+					metadata: doc.metadata,
+					source: doc.source,
+					docIndex: doc.index,
+					chunkIndex,
+					totalChunks: chunks.length
+				}));
+			} catch (error) {
+				console.error(`❌ Error chunking document ${doc.index + 1}:`, error);
+				return []; // Return empty for failed chunking
+			}
+		});
+		
+		// Flatten all chunks from all documents into a single array
+		const allChunks = (await Promise.all(chunkingPromises)).flat();
+		console.log(`✅ Created ${allChunks.length} total chunks across all documents`);
+		
+		// Stage 3: Create embeddings for all chunks in parallel
+		console.log(`🧠 Stage 3: Creating embeddings for ${allChunks.length} chunks in parallel`);
+		
+		// Create batches of 20 chunks to avoid overwhelming the Qdrant API
+		const BATCH_SIZE = 20;
+		const batches = [];
+		for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
+			batches.push(allChunks.slice(i, i + BATCH_SIZE));
+		}
+		
+		let completedChunks = 0;
+		const vectorPoints = [];
+		
+		// Process batches sequentially, but chunks within each batch in parallel
+		for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+			const batch = batches[batchIndex];
+			console.log(`⏳ Processing batch ${batchIndex + 1}/${batches.length} (${batch.length} chunks)`);
+			
+			const batchPromises = batch.map(async (chunk) => {
+				try {
+					const embedding = await this.embeddingProvider.createEmbedding(chunk.text);
+					completedChunks++;
 					
-					const embedding = await this.openaiService.createEmbedding(chunk);
-
-					vectorPoints.push({
+					if (completedChunks % 10 === 0 || completedChunks === allChunks.length) {
+						console.log(`⏳ Embedding progress: ${completedChunks}/${allChunks.length} chunks (${Math.round(completedChunks/allChunks.length*100)}%)`);
+					}
+					
+					return {
 						id: uuidv4(),
 						vector: embedding,
 						payload: {
-							text: chunk,
-							documentId: documentId,
-							chunkIndex: i,
-							totalChunks: chunks.length,
+							text: chunk.text,
+							documentId: chunk.documentId,
+							chunkIndex: chunk.chunkIndex,
+							totalChunks: chunk.totalChunks,
 							metadata: {
-								...metadata,
-								originalDocument: documentId,
+								...chunk.metadata,
+								originalDocument: chunk.documentId,
 							},
-							source,
+							source: chunk.source,
 						},
-					});
+					};
+				} catch (error) {
+					console.error(`❌ Error creating embedding for chunk:`, error);
+					return null; // Skip failed embeddings
 				}
-			} catch (error) {
-				console.error(`Error processing document:`, error);
-				// Continue with next document instead of failing the entire batch
-			}
+			});
+			
+			const batchResults = (await Promise.all(batchPromises)).filter(result => result !== null);
+			vectorPoints.push(...batchResults);
 		}
-
+		
+		// Log summary statistics
+		const totalChars = allChunks.reduce((sum, chunk) => sum + chunk.text.length, 0);
+		const storedChars = vectorPoints.reduce((sum, point) => sum + point.payload.text.length, 0);
+		
+		console.log(`📊 SUMMARY STATISTICS:`);
+		console.log(`📊 Total original characters: ${totalExtractedChars}`);
+		console.log(`📊 Total characters in chunks: ${totalChars}`);
+		console.log(`📊 Total characters in stored vectors: ${storedChars}`);
+		console.log(`📊 Character retention rate: ${((storedChars / totalExtractedChars) * 100).toFixed(2)}%`);
+		console.log(`✅ Created ${vectorPoints.length}/${allChunks.length} vector points`);
+		
 		return vectorPoints;
 	}
 
 	/**
-	 * Extract text and metadata from a document
+	 * Create a new collection with documents
 	 *
-	 * @param document Document (string path or object with text)
-	 * @returns Object with text, metadata, and source
+	 * @param collectionName Name of the collection
+	 * @param dimension Dimension of the embedding vectors
+	 * @param documents Documents to process and add
+	 * @returns Result of the operation
 	 */
-	protected async extractDocumentContent(document: any): Promise<{ text: string; metadata: any; source: string }> {
-		let text: string;
-		let metadata = {};
-		let source = "unknown";
-
+	public async createCollectionWithDocuments(
+		collectionName: string,
+		dimension: number,
+		documents: any[],
+	): Promise<any> {
 		try {
-			if (typeof document === "string") {
-				// Document is a file path
-				text = await this.convertFileToText(document);
-				source = document;
-			} else if (document.text) {
-				// Document is an object with text property
-				text = document.text;
-				metadata = document.metadata || {};
-				source = document.source || "unknown";
-			} else {
-				throw new Error("Invalid document format. Expected a file path or an object with a text property.");
+			// Check if collection already exists
+			const exists = await this.qdrantService.collectionExists(collectionName);
+
+			if (exists) {
+				return {
+					success: false,
+					message: `Collection ${collectionName} already exists`,
+				};
 			}
 
-			return { text, metadata, source };
-		} catch (error) {
-			console.error("Error extracting document content:", error);
-			throw error;
-		}
-	}
+			// Create the collection
+			await this.qdrantService.createCollection(collectionName, dimension);
 
-	/**
-	 * Split text into semantic chunks
-	 *
-	 * @param text Text to split
-	 * @returns Array of semantic chunks
-	 */
-	protected async splitTextIntoSemanticChunks(text: string): Promise<string[]> {
-		try {
-			// For very large texts, first do a basic split to avoid token limits
-			if (text.length > 10000) {
-				console.log("Large text detected, performing initial chunking");
-				const initialChunks = this.chunkTextWithOverlap(text, 5000, 0.15);
-				
-				// Then use AI to split each large chunk into semantic chunks
-				const allSemanticChunks: string[] = [];
-				
-				for (const chunk of initialChunks) {
-					const semanticChunks = await this.openaiService.splitTextIntoChunks(chunk);
-					allSemanticChunks.push(...semanticChunks);
-				}
-				
-				return allSemanticChunks;
-			} else {
-				// For smaller texts, directly use AI for semantic chunking
-				return await this.openaiService.splitTextIntoChunks(text);
+			if (documents && documents.length > 0) {
+				return await this.addDocumentsToCollection(collectionName, documents);
 			}
-		} catch (error) {
-			console.error("Error splitting text into chunks:", error);
-			// Fallback to basic chunking if AI chunking fails
-			return this.chunkTextWithOverlap(text, 1000, 0.1);
-		}
-	}
 
-	/**
-	 * Split text into chunks with overlap
-	 *
-	 * @param text Text to split
-	 * @param maxTokens Maximum tokens per chunk
-	 * @param overlapPercent Percentage of overlap between chunks
-	 * @returns Array of text chunks
-	 */
-	protected chunkTextWithOverlap(text: string, maxTokens: number, overlapPercent: number): string[] {
-		const words = text.split(/\s+/);
-		const overlapTokens = Math.floor(maxTokens * overlapPercent);
-		const chunks = [];
-
-		for (let i = 0; i < words.length; i += maxTokens - overlapTokens) {
-			const chunk = words.slice(i, i + maxTokens).join(" ");
-			chunks.push(chunk);
-		}
-
-		return chunks;
-	}
-
-	/**
-	 * Convert a file to text based on its type
-	 *
-	 * @param filePath Path to the file
-	 * @returns Extracted text
-	 */
-	protected async convertFileToText(filePath: string): Promise<string> {
-		const ext = filePath.split(".").pop()?.toLowerCase();
-
-		try {
-			if (ext === "txt") {
-				return fs.promises.readFile(filePath, "utf-8");
-			} else if (ext === "pdf") {
-				const dataBuffer = fs.readFileSync(filePath);
-				const pdfExtract = new PDFExtract();
-				const data = await pdfExtract.extractBuffer(dataBuffer);
-
-				// Combine all page content into a single string
-				return data.pages.map((page) => page.content.map((item) => item.str).join(" ")).join("\n\n");
-			} else if (ext === "docx") {
-				const result = await mammoth.extractRawText({ path: filePath });
-				return result.value;
-			} else if (ext === "md" || ext === "markdown") {
-				// Handle markdown files - just read as plain text
-				return fs.promises.readFile(filePath, "utf-8");
-			} else if (ext === "json") {
-				// Handle JSON files
-				const jsonContent = await fs.promises.readFile(filePath, "utf-8");
-				const parsedJson = JSON.parse(jsonContent);
-				// Convert JSON to string representation
-				return JSON.stringify(parsedJson, null, 2);
-			} else {
-				throw new Error(`Unsupported file type: ${ext}`);
-			}
-		} catch (error) {
-			console.error(`Error converting file ${filePath} to text:`, error);
-			throw error;
-		}
-	}
-
-	/**
-	 * Check OpenAI API status
-	 *
-	 * @returns Status information
-	 */
-	public async checkOpenAIStatus(): Promise<any> {
-		try {
-			// Create a simple embedding to test the API
-			const testEmbedding = await this.openaiService.createEmbedding("Test connection");
 			return {
-				status: "connected",
-				embeddingSize: testEmbedding.length,
-				model: "text-embedding-3-small",
+				success: true,
+				message: `Collection ${collectionName} created successfully`,
 			};
 		} catch (error: any) {
-			return {
-				status: "error",
-				message: error.message,
-			};
+			console.error(`Error creating collection with documents: ${error.message}`);
+			throw new Error(`Failed to create collection with documents: ${error.message}`);
 		}
 	}
 }

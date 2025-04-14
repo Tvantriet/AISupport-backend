@@ -10,7 +10,7 @@ export default class MockOpenAIService {
 	public async createEmbedding(text: string, model = "text-embedding-3-large"): Promise<number[]> {
 		// Return a fixed-length mock embedding vector
 		// The length should match what your real service would return
-		return Array(1536)
+		return Array(3072)
 			.fill(0)
 			.map(() => Math.random());
 	}

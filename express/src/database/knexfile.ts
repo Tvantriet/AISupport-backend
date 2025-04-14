@@ -1,18 +1,12 @@
+import 'dotenv/config';
+import type { Knex } from 'knex';
 import database from "../config/database.js";
 import lodash from "lodash";
 
-const config = database.connections[database.default];
-
-export default {
+const config: { [key: string]: Knex.Config } = {
 	development: {
-		client: config.client,
-		connection: {
-			host: config.host,
-			port: config.port,
-			database: config.database,
-			user: config.username,
-			password: config.password,
-		},
+		client: 'pg',
+		connection: process.env.DATABASE_URL,
 		migrations: {
 			tableName: "knex_migrations",
 			extension: "ts",
@@ -26,11 +20,11 @@ export default {
 		},
 		pool: {
 			min: 2,
-			max: config.connectionLimit,
+			max: database.connections[database.default].connectionLimit,
 		},
 	},
 	testing: {
-		client: config.client,
+		client: database.connections[database.default].client,
 		connection: {
 			host: process.env.DB_HOST_TEST,
 			port: lodash.parseInt(process.env.DB_PORT_TEST),
@@ -51,11 +45,11 @@ export default {
 		},
 		pool: {
 			min: 2,
-			max: config.connectionLimit,
+			max: database.connections[database.default].connectionLimit,
 		},
 	},
 	integration: {
-		client: config.client,
+		client: database.connections[database.default].client,
 		connection: {
 			host: process.env.DB_HOST_INT,
 			port: lodash.parseInt(process.env.DB_PORT_INT),
@@ -76,11 +70,11 @@ export default {
 		},
 		pool: {
 			min: 2,
-			max: config.connectionLimit,
+			max: database.connections[database.default].connectionLimit,
 		},
 	},
 	staging: {
-		client: config.client,
+		client: database.connections[database.default].client,
 		connection: {
 			host: process.env.DB_HOST_STAGE,
 			port: lodash.parseInt(process.env.DB_PORT_STAGE),
@@ -101,11 +95,11 @@ export default {
 		},
 		pool: {
 			min: 2,
-			max: config.connectionLimit,
+			max: database.connections[database.default].connectionLimit,
 		},
 	},
 	production: {
-		client: config.client,
+		client: database.connections[database.default].client,
 		connection: {
 			host: process.env.DB_HOST_PROD,
 			port: lodash.parseInt(process.env.DB_PORT_PROD),
@@ -125,11 +119,13 @@ export default {
 			directory: "seeders",
 		},
 		extra: {
-			connectionLimit: config.connectionLimit,
+			connectionLimit: database.connections[database.default].connectionLimit,
 		},
 		pool: {
 			min: 2,
-			max: config.connectionLimit,
+			max: database.connections[database.default].connectionLimit,
 		},
 	},
 };
+
+export default config;

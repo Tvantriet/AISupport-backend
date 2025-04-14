@@ -3,9 +3,9 @@ import ProductInterfaceController from "../controllers/ProductInterfaceControlle
 import { IRoute } from "../../interfaces/IRouter.js";
 
 export default class ProductInterfaceRoutes implements IRoute {
-	public getRoutes(): Router {
-		const router = Router();
-		const controller = new ProductInterfaceController();
+    public getRoutes(): Router {
+        const router = Router();
+        const controller = new ProductInterfaceController();
 
 		router.get("/status", controller.checkStatus.bind(controller));
 		
@@ -18,7 +18,7 @@ export default class ProductInterfaceRoutes implements IRoute {
 		
 		router.post("/create-empty-collection", async (req, res) => {
 			try {
-				const { collectionName, dimension = 1536 } = req.body;
+				const { collectionName, dimension = 3072 } = req.body;
 				
 				if (!collectionName) {
 					return res.status(400).json({
@@ -85,7 +85,7 @@ export default class ProductInterfaceRoutes implements IRoute {
 							</div>
 							<div class="form-group">
 								<label for="dimension">Vector Dimension:</label>
-								<input type="number" id="dimension" value="1536">
+								<input type="number" id="dimension" value="3072">
 							</div>
 							<button id="create-btn">Create Empty Collection</button>
 							<pre id="create-result"></pre>
@@ -321,7 +321,7 @@ export default class ProductInterfaceRoutes implements IRoute {
 				});
 			}
 		});
-		
-		return router;
-	}
-}
+
+        return router;
+    }
+} 

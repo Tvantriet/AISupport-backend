@@ -19,7 +19,17 @@ export default (router: Router) => {
 		apiRouter.getRoutes(),
 	);
 
+	console.log("Registering product routes");
 	router.use("/api/products", new ProductInterfaceRoutes().getRoutes());
+	
+	console.log("Registering chat routes");
 	router.use("/api/chat", new ChatInterfaceRoutes().getRoutes());
+	
+	console.log("Registering product routes");
+	router.use("/api/products", new ProductInterfaceRoutes().getRoutes());
+
+	console.log("Registering test routes");
 	router.use("/api/test", new TestRoutes().getRoutes());
+	console.log("Test routes registered");
+
 };
