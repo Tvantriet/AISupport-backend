@@ -1,7 +1,8 @@
 {
   "ts-node": {
     "experimentalResolver": true,
-    "esm": true
+    "esm": true,
+    "experimentalSpecifierResolution": "node",
   },
   "compilerOptions": {
     "jsx": "react",

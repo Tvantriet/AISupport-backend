@@ -13,8 +13,7 @@ import { redisConnect } from "./app/utils/Redis.js";
 import errorHandler from "./app/middleware/ErrorHandler.js";
 import ErrorReporting from "./app/utils/ErrorReporting.js";
 import notFound from "./app/middleware/NotFound.js";
-import { attachAdminPanel } from "./app/utils/AdminPanel.js";
-import { dbConnection } from "./database/typeorm-db.js";
+import { dbConnection, AppDataSource } from "./database/typeorm-db.js";
 import logtrace from "./app/middleware/LogTrace.js";
 import { dirName } from "./app/utils/MiscHelpers.js";
 import database from "./config/database.js";
@@ -92,14 +91,15 @@ class Server {
 
 		// init db
 		if (database.enabled) await dbConnection();
-
-		// init adminJS
-		if (config.adminPanel.enabled) await attachAdminPanel(this.app);
+		// @ts-ignore TypeORM does not support but the database supports
+		await AppDataSource.initialize();
 
 		// Be sure to set bodyparser after admin panel
-		this.app.use(express.json()); // to support JSON-encoded bodies
-		this.app.use(express.urlencoded({ extended: true })); // to support URL-encoded bodies
+		// Apply desired limits here for JSON and URL-encoded bodies
+		this.app.use(express.json({ limit: '10mb' })); 
+		this.app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
 		this.app.use(logtrace);
+		
 
 		// Set routes
 		registerRoutes(router);

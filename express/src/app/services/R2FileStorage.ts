@@ -65,7 +65,7 @@ export default class R2FileStorage implements FileStorageProvider {
       return `${this.publicUrl}/${filePath}`;
     } catch (error) {
       console.error('Error uploading file to R2:', error);
-      throw new Error(`Failed to upload file: ${error.message}`);
+      throw new Error(`Failed to upload file: ${error}`);
     }
   }
   
@@ -107,7 +107,7 @@ export default class R2FileStorage implements FileStorageProvider {
       return this.streamToBuffer(stream);
     } catch (error) {
       console.error('Error getting file from R2:', error);
-      throw new Error(`Failed to get file: ${error.message}`);
+      throw new Error(`Failed to get file: ${error}`);
     }
   }
   
@@ -127,7 +127,7 @@ export default class R2FileStorage implements FileStorageProvider {
       return await getSignedUrl(this.client, command, { expiresIn });
     } catch (error) {
       console.error('Error creating signed URL:', error);
-      throw new Error(`Failed to create signed URL: ${error.message}`);
+      throw new Error(`Failed to create signed URL: ${error}`);
     }
   }
   

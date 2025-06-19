@@ -7,7 +7,7 @@ import fetch from 'node-fetch';
 import ProductService from '../app/services/ProductService.js';
 import ProductRepository from '../app/repositories/ProductRepository.js';
 import R2FileStorage from '../app/services/R2FileStorage.js';
-import PostgresService from '../app/services/PostgresService.js';
+import PostgresService from '../app/services/DatabaseService.js';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);

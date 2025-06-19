@@ -1,7 +1,7 @@
 import fs from "fs";
-import { PDFExtract } from "pdf.js-extract";
 import mammoth from "mammoth";
 import { AIProvider } from "../interfaces/AIProvider.js";
+import { PDFExtract } from 'pdf.js-extract';
 
 /**
  * Service for text processing operations like chunking, 
@@ -24,12 +24,12 @@ export default class TextProcessingService {
     try {
       // For very large texts, first do a basic split to avoid token limits
       if (text.length > 10000) {
-        console.log(`🔄 Large text detected (${text.length} chars), performing initial chunking`);
-        const initialChunks = this.chunkTextWithOverlap(text, 800, 0.15);
-        console.log(`📊 Created ${initialChunks.length} initial chunks for parallel processing`);
+        console.log(`Large text detected (${text.length} chars), performing initial chunking`);
+        const initialChunks = this.chunkTextWithOverlap(text, 1500, 0.15);
+        console.log(`Created ${initialChunks.length} initial chunks for parallel processing`);
         
         // Process all chunks in parallel instead of sequentially
-        console.log(`🚀 Processing ${initialChunks.length} chunks in parallel with AI`);
+        console.log(`Processing ${initialChunks.length} chunks in parallel with AI`);
         const chunkPromises = initialChunks.map(chunk => 
           this.aiProvider.splitTextIntoChunks(chunk)
         );
@@ -40,17 +40,17 @@ export default class TextProcessingService {
         // Flatten the array of arrays into a single array
         const allSemanticChunks = semanticChunksArrays.flat();
         
-        console.log(`✅ Parallel processing complete: ${initialChunks.length} initial chunks → ${allSemanticChunks.length} semantic chunks`);
+        console.log(`Parallel processing complete: ${initialChunks.length} initial chunks → ${allSemanticChunks.length} semantic chunks`);
         return allSemanticChunks;
       } else {
         // For smaller texts, directly use AI for semantic chunking
         return await this.aiProvider.splitTextIntoChunks(text);
       }
     } catch (error) {
-      console.error("❌ Error splitting text into chunks:", error);
+      console.error("Error splitting text into chunks:", error);
       // Fallback to basic chunking if AI chunking fails
       const basicChunks = this.chunkTextWithOverlap(text, 1000, 0.1);
-      console.log(`⚠️ Falling back to basic chunking: created ${basicChunks.length} chunks`);
+      console.log(`Falling back to basic chunking: created ${basicChunks.length} chunks`);
       return basicChunks;
     }
   }
@@ -63,13 +63,13 @@ export default class TextProcessingService {
    * @param overlapPercent Percentage of overlap between chunks
    * @returns Array of text chunks
    */
-  public chunkTextWithOverlap(text: string, maxTokens: number, overlapPercent: number): string[] {
+  private chunkTextWithOverlap(text: string, maxWords: number, overlapPercent: number): string[] {
     const words = text.split(/\s+/);
-    const overlapTokens = Math.floor(maxTokens * overlapPercent);
+    const overlapTokens = Math.floor(maxWords * overlapPercent);
     const chunks = [];
 
-    for (let i = 0; i < words.length; i += maxTokens - overlapTokens) {
-      const chunk = words.slice(i, i + maxTokens).join(" ");
+    for (let i = 0; i < words.length; i += maxWords - overlapTokens) {
+      const chunk = words.slice(i, i + maxWords).join(" ");
       chunks.push(chunk);
     }
 
@@ -83,7 +83,7 @@ export default class TextProcessingService {
    * @param text Text to chunk
    * @returns Array of text chunks
    */
-  public performBasicChunking(text: string): string[] {
+  private performBasicChunking(text: string): string[] {
     console.log("Performing basic chunking as fallback");
     
     // Simple paragraph-based chunking
@@ -143,73 +143,47 @@ export default class TextProcessingService {
    * @param filePath Path to the file
    * @returns Extracted text
    */
-  public async convertFileToText(filePath: string): Promise<string> {
+  private async convertFileToText(content: Buffer, file_extension: string): Promise<string> {
     // Check file extension
-    const ext = filePath.split('.').pop()?.toLowerCase();
-    
-    try {
-      if (ext === 'pdf') {
-        console.log(`📄 Processing PDF file: ${filePath}`);
-        const pdfExtract = new PDFExtract();
-        const data = await pdfExtract.extract(filePath, {});
-        
-        const text = data.pages.map(page => page.content.map(item => item.str).join(' ')).join('\n\n');
-        console.log(`📊 Extracted ${text.length} characters, ${data.pages.length} pages from PDF`);
-        
-        return text;
-      } 
-      else if (['docx', 'doc'].includes(ext || '')) {
-        console.log(`📄 Processing DOCX file: ${filePath}`);
-        const result = await mammoth.extractRawText({path: filePath});
-        console.log(`📊 Extracted ${result.value.length} characters from DOCX`);
-        
-        return result.value;
-      } 
-      else if (['txt', 'md'].includes(ext || '')) {
-        console.log(`📄 Processing text file: ${filePath}`);
-        const text = fs.readFileSync(filePath, 'utf8');
-        console.log(`📊 Extracted ${text.length} characters from text file`);
-        
-        return text;
-      } 
-      else {
-        throw new Error(`Unsupported file type: ${ext}`);
-      }
-    } catch (error) {
-      console.error(`Error converting file ${filePath} to text:`, error);
-      throw error;
-    }
-  }
+    let text = '';
 
+    if (file_extension === 'pdf') {
+      const pdfExtract = new PDFExtract();
+     const data = await pdfExtract.extractBuffer(content);
+      text = data.pages.map(page => 
+        page.content.map(item => item.str).join(' ')
+      ).join('\n');
+      
+    } else if (file_extension === 'docx') {
+      const docxData = await mammoth.extractRawText({ buffer: content });
+      text = docxData.value;
+    }
+    else if (file_extension === 'txt') {
+      text = content.toString('utf-8');
+    }
+    else {
+      throw new Error(`Unsupported file extension: ${file_extension}`);
+    }
+
+    return text;
+  }
   /**
    * Extract text and metadata from a document
    *
    * @param document Document (string path or object with text)
    * @returns Object with text, metadata, and source
    */
-  public async extractDocumentContent(document: any): Promise<{ text: string; metadata: any; source: string }> {
+  public async extractDocumentContent(documentContent: Buffer, mimeType: string): Promise<string> {
     let text: string;
-    let metadata = {};
-    let source = "unknown";
 
     try {
-      if (typeof document === "string") {
-        // Document is a file path
-        text = await this.convertFileToText(document);
-        source = document;
-      } else if (document.text) {
-        // Document is an object with text property
-        text = document.text;
-        metadata = document.metadata || {};
-        source = document.source || "unknown";
-      } else {
-        throw new Error("Invalid document format. Expected a file path or an object with a text property.");
-      }
-
-      return { text, metadata, source };
+      text = await this.convertFileToText(documentContent, mimeType);
+      console.log(`Extracted ${text.length} characters from Buffer`);
     } catch (error) {
       console.error("Error extracting document content:", error);
       throw error;
     }
+
+    return text;
   }
 } 

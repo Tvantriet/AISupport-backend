@@ -24,19 +24,18 @@ export default class ChatInterfaceController extends Controller {
 	 */
 	public async processUserRequest(req: Request, res: Response) {
 		try {
-			const { query, productName, productId, conversationHistory } = req.body;
+			const { query, productId, conversationHistory } = req.body;
 
-			if (!query || !productName || !productId) {
+			if (!query || !conversationHistory || !productId) {
 				return res.status(400).json({
 					success: false,
-					error: "Query, productId and collection name are required",
+					error: "Query, productId and conversation history name are required",
 				});
 			}
 
 			// Process the user request using the ChatService
 			const result = await this.chatService.processUserRequest(
 				query, 
-				productName, 
 				productId,
 				conversationHistory
 			);

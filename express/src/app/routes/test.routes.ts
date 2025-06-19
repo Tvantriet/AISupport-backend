@@ -4,8 +4,6 @@ import fs from "fs";
 import path from "path";
 import DocumentProcessingService from "../services/DocumentProcessingService.js";
 import ApiResponses from "../utils/ApiResponses.js";
-import PostgresService from "../services/PostgresService.js";
-
 export default class TestRoutes implements IRoute {
   public getRoutes(): Router {
     const router = Router();
@@ -14,103 +12,6 @@ export default class TestRoutes implements IRoute {
     // Test the basic endpoint first to verify routing works
     router.get("/", (req, res) => {
       res.json({ message: "Test routes are working" });
-    });
-
-    // Process all files in test_data_tmp folder
-    router.post("/process-test-files", async (req, res) => {
-      try {
-        const { collectionName } = req.body;
-        
-        if (!collectionName) {
-          return res.status(400).json({
-            success: false,
-            error: "Collection name is required"
-          });
-        }
-        
-        const testDataDir = path.join(process.cwd(), "src", "public", "test_data_tmp");
-        console.log("Reading files from:", testDataDir);
-        
-        // Check if directory exists
-        if (!fs.existsSync(testDataDir)) {
-          return res.status(404).json({
-            success: false,
-            error: `Directory ${testDataDir} not found`
-          });
-        }
-        
-        // Read all files from directory
-        const files = fs.readdirSync(testDataDir);
-        const filePaths = files.map(file => path.join(testDataDir, file));
-        
-        console.log(`Found ${filePaths.length} files to process in ${testDataDir}`);
-        
-        // Check if collection exists, create if it doesn't
-        const collectionExists = await documentService.qdrantService.collectionExists(collectionName);
-        
-        if (!collectionExists) {
-          console.log(`Creating new collection: ${collectionName}`);
-          await documentService.qdrantService.createCollection(collectionName, 3072); // Using standard embedding size
-        }
-        
-        // Process files
-        const result = await documentService.addDocumentsToCollection(collectionName, filePaths);
-        
-        return res.json({
-          success: true,
-          files: filePaths,
-          result
-        });
-      } catch (error: any) {
-        console.error("Error processing test files:", error);
-        return res.status(500).json({
-          success: false,
-          error: error.message
-        });
-      }
-    });
-    
-    // List all files in test_data_tmp folder
-    router.get("/list-test-files", (req, res) => {
-      try {
-        const testDataDir = path.join(process.cwd(), "src", "public", "test_data_tmp");
-        console.log("TestRoutes - Reading files from:", testDataDir);
-        
-        // Check if directory exists
-        if (!fs.existsSync(testDataDir)) {
-          console.log(`Directory not found: ${testDataDir}`);
-          return res.status(404).json({
-            success: false,
-            error: `Directory ${testDataDir} not found`
-          });
-        }
-        
-        // Read all files from directory
-        const files = fs.readdirSync(testDataDir);
-        console.log(`Found ${files.length} files`);
-        
-        const fileDetails = files.map(file => {
-          const filePath = path.join(testDataDir, file);
-          const stats = fs.statSync(filePath);
-          return {
-            name: file,
-            path: filePath,
-            size: stats.size,
-            created: stats.birthtime
-          };
-        });
-        
-        return res.json({
-          success: true,
-          files: fileDetails
-        });
-      } catch (error: any) {
-        console.error("Error listing test files:", error);
-        return res.status(500).json({
-          success: false,
-          error: error.message
-        });
-      }
     });
 
     // Add a simple test page with file upload and processing
@@ -210,22 +111,6 @@ export default class TestRoutes implements IRoute {
         </body>
         </html>
       `);
-    });
-    
-    // Add a route to check database connection
-    router.get('/db-connection', async (req, res) => {
-      try {
-        const db = new PostgresService();
-        await db.connect();
-        res.json({ success: true, message: 'Database connection successful' });
-      } catch (error) {
-        console.error('Database connection error:', error);
-        res.status(500).json({ 
-          success: false, 
-          message: 'Database connection failed',
-          error: error
-        });
-      }
     });
     
     return router;

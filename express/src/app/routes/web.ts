@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { IRoute } from "../../interfaces/IRouter.js";
-import Admin from "./groups/admin.js";
 
 /*
 |--------------------------------------------------------------------------
@@ -14,11 +13,6 @@ import Admin from "./groups/admin.js";
 */
 
 class Web implements IRoute {
-	private admin: Admin;
-
-	constructor() {
-		this.admin = new Admin();
-	}
 
 	public getRoutes(): Router {
 		const router = Router();
@@ -27,10 +21,7 @@ class Web implements IRoute {
 		router.get("/", (req, res) => {
 			res.json({});
 		});
-
-		/* ----------------------------------------Admin routes----------------------------------------------*/
-		router.use("/", this.admin.getRoutes());
-
+		
 		return router;
 	}
 }

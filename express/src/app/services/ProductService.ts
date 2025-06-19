@@ -1,29 +1,56 @@
 import { FileStorageProvider } from "../interfaces/FileStorageProvider.js";
-import ProductRepository from "../repositories/ProductRepository.js";
-import { CreateProductInput, Product, UpdateProductInput } from "../models/Product.js";
+import { ProductRepository } from "../repositories/ProductRepository.js";
+import { CreateProductInput, Product as ProductDTO, UpdateProductInput } from "../dtos/product.dto.js";
+import { Product } from "../models/Product.entity.js"; // Import Entity
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import R2FileStorage from "./R2FileStorage.js";
 
 export default class ProductService {
   constructor(
-    private productRepository: ProductRepository,
-    private fileStorage: FileStorageProvider
-  ) {}
-  
+    private productRepository?: ProductRepository,
+    private fileStorage?: FileStorageProvider
+  ) {
+    this.productRepository = productRepository || new ProductRepository();
+    this.fileStorage = fileStorage || new R2FileStorage();
+  }
+
+  private mapEntityToDto(entity: Product): ProductDTO {
+    return {
+        id: entity.id,
+        name: entity.product_name, // Map database column name
+        description: entity.description,
+        imageUrl: entity.image_url,
+    };
+}
   /**
    * Get all products
    */
-  async getAllProducts(): Promise<Product[]> {
-    return this.productRepository.findAll();
+  async getAllProducts(): Promise<ProductDTO[]> {
+    const entities = await this.productRepository.findAll();
+    return entities.map(entity => this.mapEntityToDto(entity)); // Map entities to DTOs
+
   }
   
   /**
    * Get product by ID
    */
-  async getProductById(id: number): Promise<Product | null> {
-    return this.productRepository.findById(id);
+  async getProductById(id: string): Promise<ProductDTO | null> {
+    const entity = await this.productRepository.findById(id);
+    return entity ? this.mapEntityToDto(entity) : null;
   }
-  
+
+
+  /**
+   * Get category IDs for a product
+   */
+  async getCategoryIds(productId: string): Promise<string[]> {
+    console.log("product with categories: ", productId)
+
+    const product = await this.productRepository.findByIdWithRelated(productId);
+    return product.categories.map((category) => category.id);
+  }
+
   /**
    * Create a new product with optional image upload
    */
@@ -50,8 +77,7 @@ export default class ProductService {
       // Create product in database
       const product = await this.productRepository.create({
         ...productData,
-        imageUrl,
-        imageKey,
+        image_url: imageUrl,
       });
       
       return product;
@@ -64,7 +90,7 @@ export default class ProductService {
   /**
    * Update a product with optional image upload
    */
-  async updateProduct(id: number, productData: UpdateProductInput): Promise<Product | null> {
+  async updateProduct(id: string, productData: UpdateProductInput): Promise<Product | null> {
     try {
       // Get existing product
       const existingProduct = await this.productRepository.findById(id);
@@ -74,13 +100,13 @@ export default class ProductService {
       }
       
       // Handle image upload if present
-      let imageUrl = existingProduct.imageUrl;
-      let imageKey = existingProduct.imageKey;
+      let imageUrl = existingProduct.image_url;
+      let imageKey = existingProduct.image_key;
       
       if (productData.image) {
         // Delete old image if exists
-        if (existingProduct.imageKey) {
-          await this.fileStorage.deleteFile(existingProduct.imageKey);
+        if (existingProduct.image_key) {
+          await this.fileStorage.deleteFile(existingProduct.image_key);
         }
         
         // Generate a unique filename
@@ -100,8 +126,8 @@ export default class ProductService {
       // Update product in database
       await this.productRepository.update(id, {
         ...productData,
-        imageUrl,
-        imageKey,
+        image_url: imageUrl,
+        image_key: imageKey,
       });
       
       return this.productRepository.findById(id);
@@ -114,7 +140,7 @@ export default class ProductService {
   /**
    * Delete a product and its image
    */
-  async deleteProduct(id: number): Promise<boolean> {
+  async deleteProduct(id: string): Promise<boolean> {
     try {
       // Get existing product
       const existingProduct = await this.productRepository.findById(id);
@@ -124,8 +150,8 @@ export default class ProductService {
       }
       
       // Delete image if exists
-      if (existingProduct.imageKey) {
-        await this.fileStorage.deleteFile(existingProduct.imageKey);
+      if (existingProduct.image_key) {
+        await this.fileStorage.deleteFile(existingProduct.image_key);
       }
       
       // Delete from database
@@ -139,8 +165,9 @@ export default class ProductService {
   /**
    * Get products by category
    */
-  async getProductsByCategory(category: string): Promise<Product[]> {
-    return this.productRepository.findByCategory(category);
+  async getProductsByCategory(category: string): Promise<ProductDTO[]> {
+    const entities = await this.productRepository.findByCategory(category);
+    return entities.map(entity => this.mapEntityToDto(entity)); // Map entities to DTOs
   }
   
   /**
@@ -184,6 +211,7 @@ export default class ProductService {
    * @returns Search results with pagination metadata
    */
   async searchProducts(query: string, page: number = 1, limit: number = 20) {
+    console.log(`[SEARCH] Searching for "${query}" on page ${page} with limit ${limit}`);
     return this.productRepository.search(query, page, limit);
   }
   
